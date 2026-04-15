@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Smart Budget Planner{% endblock %}</title>
+    <script>
+        // Apply persisted theme before CSS loads to prevent light-mode flash.
+        (function() {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark' || savedTheme === 'light') {
+                    document.documentElement.setAttribute('data-theme', savedTheme);
+                }
+            } catch (e) {
+                // Ignore storage access issues and keep default theme.
+            }
+        })();
+    </script>
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
