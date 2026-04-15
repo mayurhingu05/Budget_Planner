@@ -1,0 +1,485 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Smart Budget Planner{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1><i class="fas fa-chart-line"></i> Dashboard</h1>
+            <p class="header-subtitle">Welcome back, {{ session.username }}! Here's your financial overview.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('export_pdf') }}" class="btn btn-outline">
+                <i class="fas fa-download"></i> Export Report
+            </a>
+            <button class="btn btn-primary" onclick="openAddTransactionModal()">
+                <i class="fas fa-plus"></i> Add Transaction
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert Banner for Budget Warning -->
+    {% if summary.monthly_salary > 0 and summary.monthly_expenses > summary.monthly_salary * 0.9 %}
+    <div class="alert-banner alert-danger">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span><strong>Budget Alert:</strong> You've spent {{ "%.1f"|format((summary.monthly_expenses / summary.monthly_salary) * 100) }}% of your monthly budget!</span>
+    </div>
+    {% elif summary.monthly_salary > 0 and summary.monthly_expenses > summary.monthly_salary * 0.75 %}
+    <div class="alert-banner alert-warning">
+        <i class="fas fa-exclamation-circle"></i>
+        <span><strong>Warning:</strong> You've used {{ "%.1f"|format((summary.monthly_expenses / summary.monthly_salary) * 100) }}% of your monthly budget.</span>
+    </div>
+    {% endif %}
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+        <div class="summary-card income">
+            <div class="card-icon">
+                <i class="fas fa-arrow-down"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-label">Total Income</span>
+                <h3 class="card-value">{{ summary.total_income | format_currency }}</h3>
+                <span class="card-trend positive">
+                    <i class="fas fa-arrow-up"></i> Lifetime
+                </span>
+            </div>
+        </div>
+
+        <div class="summary-card expense">
+            <div class="card-icon">
+                <i class="fas fa-arrow-up"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-label">Total Expenses</span>
+                <h3 class="card-value">{{ summary.total_expenses | format_currency }}</h3>
+                <span class="card-trend negative">
+                    <i class="fas fa-arrow-up"></i> Lifetime
+                </span>
+            </div>
+        </div>
+
+        <div class="summary-card balance {% if summary.balance < 0 %}negative{% endif %}">
+            <div class="card-icon">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-label">Current Balance</span>
+                <h3 class="card-value">{{ summary.balance | format_currency }}</h3>
+                <span class="card-trend {% if summary.balance >= 0 %}positive{% else %}negative{% endif %}">
+                    <i class="fas fa-{% if summary.balance >= 0 %}check-circle{% else %}exclamation-circle{% endif %}"></i>
+                    {% if summary.balance >= 0 %}Healthy{% else %}Overdrawn{% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="summary-card budget">
+            <div class="card-icon">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="card-content">
+                <span class="card-label">Daily Spending Limit</span>
+                <h3 class="card-value">{{ summary.daily_spending_limit | format_currency }}</h3>
+                <span class="card-trend">
+                    <i class="fas fa-clock"></i> {{ summary.days_remaining }} days left
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Section -->
+    <div class="budget-section">
+        <div class="budget-card">
+            <div class="budget-header">
+                <h3><i class="fas fa-bullseye"></i> Monthly Budget</h3>
+                <button class="btn btn-sm btn-outline" onclick="openSalaryModal()">
+                    <i class="fas fa-edit"></i> Update Salary
+                </button>
+            </div>
+            
+            <div class="budget-info">
+                <div class="budget-item">
+                    <span class="budget-label">Monthly Salary</span>
+                    <span class="budget-value">{{ summary.monthly_salary | format_currency }}</span>
+                </div>
+                <div class="budget-item">
+                    <span class="budget-label">Spent This Month</span>
+                    <span class="budget-value spent">{{ summary.monthly_expenses | format_currency }}</span>
+                </div>
+                <div class="budget-item">
+                    <span class="budget-label">Remaining</span>
+                    <span class="budget-value remaining">{{ summary.remaining_budget | format_currency }}</span>
+                </div>
+            </div>
+            
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill {% if summary.monthly_salary > 0 and summary.monthly_expenses / summary.monthly_salary > 0.9 %}danger{% elif summary.monthly_salary > 0 and summary.monthly_expenses / summary.monthly_salary > 0.75 %}warning{% endif %}" 
+                         style="width: {{ (summary.monthly_expenses / summary.monthly_salary * 100) if summary.monthly_salary > 0 else 0 }}%">
+                    </div>
+                </div>
+                <span class="progress-text">
+                    {{ "%.1f"|format((summary.monthly_expenses / summary.monthly_salary * 100) if summary.monthly_salary > 0 else 0) }}% used
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-section">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3><i class="fas fa-chart-pie"></i> Expenses by Category</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3><i class="fas fa-chart-bar"></i> Weekly Spending</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Financial Advisor Section -->
+    <div class="ai-advisor-section">
+        <div class="ai-card">
+            <div class="ai-header">
+                <div class="ai-title">
+                    <i class="fas fa-robot"></i>
+                    <h3>AI Financial Advisor</h3>
+                </div>
+                <span class="ai-badge">Smart Insights</span>
+            </div>
+            <div class="ai-advice-list" id="aiAdviceList">
+                {% for advice in ai_advice %}
+                <div class="advice-item advice-{{ advice.type }}">
+                    <div class="advice-icon">
+                        <i class="fas fa-{{ advice.icon }}"></i>
+                    </div>
+                    <div class="advice-content">
+                        <h4>{{ advice.title }}</h4>
+                        <p>{{ advice.message }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="transactions-section">
+        <div class="section-header">
+            <h3><i class="fas fa-history"></i> Recent Transactions</h3>
+            <a href="{{ url_for('transactions') }}" class="btn btn-sm btn-outline">
+                View All <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+        
+        <div class="transactions-table-container">
+            <table class="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>{{ transaction.date | format_date }}</td>
+                        <td>
+                            <span class="category-badge category-{{ transaction.category|lower }}">
+                                <i class="fas fa-{% if transaction.category == 'Food' %}utensils{% elif transaction.category == 'Travel' %}plane{% elif transaction.category == 'Bills' %}file-invoice{% elif transaction.category == 'Shopping' %}shopping-cart{% elif transaction.category == 'Health' %}heartbeat{% else %}tag{% endif %}"></i>
+                                {{ transaction.category }}
+                            </span>
+                        </td>
+                        <td>{{ transaction.description or '-' }}</td>
+                        <td>
+                            <span class="type-badge type-{{ transaction.type }}">
+                                <i class="fas fa-{% if transaction.type == 'income' %}arrow-down{% else %}arrow-up{% endif %}"></i>
+                                {{ transaction.type|title }}
+                            </span>
+                        </td>
+                        <td class="amount {% if transaction.type == 'income' %}income{% else %}expense{% endif %}">
+                            {% if transaction.type == 'income' %}+{% else %}-{% endif %}{{ transaction.amount | format_currency }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <i class="fas fa-inbox"></i>
+                            <p>No transactions yet. Add your first transaction!</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal" id="addTransactionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus-circle"></i> Add Transaction</h3>
+            <button class="modal-close" onclick="closeAddTransactionModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="{{ url_for('add_transaction') }}">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="type">Type</label>
+                        <select name="type" id="type" required onchange="updateCategories()">
+                            <option value="expense">Expense</option>
+                            <option value="income">Income</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Amount</label>
+                        <input type="number" name="amount" id="amount" step="0.01" min="0.01" required 
+                               placeholder="0.00">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select name="category" id="category" required>
+                        <option value="Food">Food</option>
+                        <option value="Travel">Travel</option>
+                        <option value="Bills">Bills</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Health">Health</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" name="date" id="date" required 
+                           value="{{ datetime.now().strftime('%Y-%m-%d') }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description (Optional)</label>
+                    <input type="text" name="description" id="description" 
+                           placeholder="Enter description">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeAddTransactionModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Transaction</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Update Salary Modal -->
+<div class="modal" id="salaryModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-money-bill-wave"></i> Update Monthly Salary</h3>
+            <button class="modal-close" onclick="closeSalaryModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="{{ url_for('update_salary') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="monthly_salary">Monthly Salary</label>
+                    <input type="number" name="monthly_salary" id="monthly_salary" 
+                           step="0.01" min="0" required 
+                           value="{{ summary.monthly_salary }}"
+                           placeholder="Enter your monthly salary">
+                    <small class="form-help">This helps us calculate your daily spending limit</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeSalaryModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Salary</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Modal Functions
+function openAddTransactionModal() {
+    document.getElementById('addTransactionModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddTransactionModal() {
+    document.getElementById('addTransactionModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function openSalaryModal() {
+    document.getElementById('salaryModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeSalaryModal() {
+    document.getElementById('salaryModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Update categories based on type
+function updateCategories() {
+    const type = document.getElementById('type').value;
+    const categorySelect = document.getElementById('category');
+    
+    const expenseCategories = ['Food', 'Travel', 'Bills', 'Shopping', 'Health', 'Other'];
+    const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other'];
+    
+    const categories = type === 'income' ? incomeCategories : expenseCategories;
+    
+    categorySelect.innerHTML = categories.map(cat => 
+        `<option value="${cat}">${cat}</option>`
+    ).join('');
+}
+
+// Close modals on outside click
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+// Initialize Charts
+document.addEventListener('DOMContentLoaded', function() {
+    fetchChartData();
+});
+
+function fetchChartData() {
+    fetch('/api/chart_data')
+        .then(response => response.json())
+        .then(data => {
+            initCategoryChart(data.pie_chart);
+            initWeeklyChart(data.bar_chart);
+        })
+        .catch(error => console.error('Error fetching chart data:', error));
+}
+
+function initCategoryChart(chartData) {
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    
+    // Category colors
+    const colors = [
+        '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', 
+        '#f97316', '#eab308', '#22c55e', '#06b6d4'
+    ];
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                data: chartData.data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: getComputedStyle(document.body).getPropertyValue('--card-bg').trim()
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true,
+                        color: getComputedStyle(document.body).getPropertyValue('--text-primary').trim()
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ₹${value.toFixed(2)} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '60%'
+        }
+    });
+}
+
+function initWeeklyChart(chartData) {
+    const ctx = document.getElementById('weeklyChart').getContext('2d');
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Daily Expenses',
+                data: chartData.data,
+                backgroundColor: '#6366f1',
+                borderRadius: 6,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Spent: ₹${context.parsed.y.toFixed(2)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: getComputedStyle(document.body).getPropertyValue('--text-secondary').trim()
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: getComputedStyle(document.body).getPropertyValue('--border-color').trim()
+                    },
+                    ticks: {
+                        color: getComputedStyle(document.body).getPropertyValue('--text-secondary').trim(),
+                        callback: function(value) {
+                            return '₹' + value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,551 @@
+{% extends 'base.html' %}
+
+{% block title %}Savings Goals - Smart Budget Planner{% endblock %}
+
+{% block content %}
+<div class="goals-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1><i class="fas fa-bullseye"></i> Savings Goals</h1>
+            <p class="header-subtitle">Set targets and track your progress towards financial freedom</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="openAddGoalModal()">
+                <i class="fas fa-plus"></i> New Goal
+            </button>
+        </div>
+    </div>
+
+    <!-- Goals Summary -->
+    <div class="goals-summary">
+        {% set total_target = goals|sum(attribute='target_amount') %}
+        {% set total_saved = goals|sum(attribute='current_amount') %}
+        {% set active_goals = goals|length %}
+        {% set completed_goals = goals|selectattr('current_amount', 'ge', attribute='target_amount')|list|length %}
+        
+        <div class="summary-card">
+            <div class="summary-icon">
+                <i class="fas fa-target"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Active Goals</span>
+                <span class="summary-value">{{ active_goals }}</span>
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Completed</span>
+                <span class="summary-value">{{ completed_goals }}</span>
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-icon primary">
+                <i class="fas fa-piggy-bank"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Total Saved</span>
+                <span class="summary-value">{{ total_saved | format_currency }}</span>
+            </div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-icon warning">
+                <i class="fas fa-flag-checkered"></i>
+            </div>
+            <div class="summary-info">
+                <span class="summary-label">Target Amount</span>
+                <span class="summary-value">{{ total_target | format_currency }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goals Grid -->
+    <div class="goals-grid">
+        {% for goal in goals %}
+        {% set progress = (goal.current_amount / goal.target_amount * 100) if goal.target_amount > 0 else 0 %}
+        {% set is_completed = goal.current_amount >= goal.target_amount %}
+        
+        <div class="goal-card {% if is_completed %}completed{% endif %}">
+            <div class="goal-header">
+                <div class="goal-icon">
+                    <i class="fas fa-{% if 'vacation' in goal.name|lower or 'travel' in goal.name|lower %}plane{% elif 'car' in goal.name|lower %}car{% elif 'house' in goal.name|lower or 'home' in goal.name|lower %}home{% elif 'education' in goal.name|lower or 'study' in goal.name|lower %}graduation-cap{% elif 'emergency' in goal.name|lower %}first-aid{% elif 'wedding' in goal.name|lower %}ring{% elif 'retirement' in goal.name|lower %}umbrella-beach{% else %}star{% endif %}"></i>
+                </div>
+                <div class="goal-actions">
+                    {% if not is_completed %}
+                    <button class="btn-icon" onclick="openUpdateProgressModal({{ goal.id }}, '{{ goal.name }}')" title="Add Progress">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    {% endif %}
+                    <a href="{{ url_for('delete_goal', goal_id=goal.id) }}" 
+                       class="btn-icon btn-danger" 
+                       onclick="return confirm('Are you sure you want to delete this goal?')"
+                       title="Delete">
+                        <i class="fas fa-trash-alt"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="goal-content">
+                <h3 class="goal-name">{{ goal.name }}</h3>
+                
+                {% if goal.deadline %}
+                <div class="goal-deadline">
+                    <i class="fas fa-calendar"></i>
+                    <span>Target: {{ goal.deadline | format_date }}</span>
+                </div>
+                {% endif %}
+                
+                <div class="goal-amounts">
+                    <div class="amount-saved">
+                        <span class="amount-label">Saved</span>
+                        <span class="amount-value">{{ goal.current_amount | format_currency }}</span>
+                    </div>
+                    <div class="amount-target">
+                        <span class="amount-label">Target</span>
+                        <span class="amount-value">{{ goal.target_amount | format_currency }}</span>
+                    </div>
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-bar">
+                        <div class="progress-fill {% if progress >= 100 %}success{% elif progress >= 75 %}primary{% elif progress >= 50 %}warning{% else %}danger{% endif %}" 
+                             style="width: {{ progress }}%"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span class="progress-percentage">{{ "%.1f"|format(progress) }}%</span>
+                        <span class="progress-remaining">
+                            {% if not is_completed %}
+                            {{ (goal.target_amount - goal.current_amount) | format_currency }} left
+                            {% else %}
+                            Goal achieved!
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                {% if is_completed %}
+                <div class="goal-badge">
+                    <i class="fas fa-trophy"></i> Completed!
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-goals">
+            <div class="empty-content">
+                <div class="empty-icon">
+                    <i class="fas fa-bullseye"></i>
+                </div>
+                <h3>No savings goals yet</h3>
+                <p>Create your first goal and start saving towards your dreams</p>
+                <button class="btn btn-primary" onclick="openAddGoalModal()">
+                    <i class="fas fa-plus"></i> Create Goal
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add Goal Modal -->
+<div class="modal" id="addGoalModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus-circle"></i> Create New Goal</h3>
+            <button class="modal-close" onclick="closeAddGoalModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="{{ url_for('add_savings_goal') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="name">Goal Name</label>
+                    <input type="text" name="name" id="name" required 
+                           placeholder="e.g., New Car, Vacation, Emergency Fund">
+                </div>
+                
+                <div class="form-group">
+                    <label for="target_amount">Target Amount</label>
+                    <input type="number" name="target_amount" id="target_amount" 
+                           step="0.01" min="0.01" required 
+                           placeholder="0.00">
+                </div>
+                
+                <div class="form-group">
+                    <label for="deadline">Target Date (Optional)</label>
+                    <input type="date" name="deadline" id="deadline">
+                    <small class="form-help">Setting a deadline helps you stay on track</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeAddGoalModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Goal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Update Progress Modal -->
+<div class="modal" id="updateProgressModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-chart-line"></i> Update Progress</h3>
+            <button class="modal-close" onclick="closeUpdateProgressModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="" id="updateProgressForm">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="progress_amount">Amount to Add</label>
+                    <input type="number" name="amount" id="progress_amount" 
+                           step="0.01" min="0.01" required 
+                           placeholder="0.00">
+                    <small class="form-help">Enter the amount you've saved towards this goal</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeUpdateProgressModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Progress</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.goals-page {
+    padding: 1rem 0;
+}
+
+.goals-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.summary-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    background: rgba(99, 102, 241, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--primary-color);
+}
+
+.summary-icon.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.summary-icon.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.summary-icon.primary {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary-color);
+}
+
+.summary-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.goals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.goal-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.goal-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.goal-card.completed {
+    border-color: #10b981;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(16, 185, 129, 0.05) 100%);
+}
+
+.goal-card.completed::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #10b981;
+}
+
+.goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.goal-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: white;
+}
+
+.goal-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.goal-actions .btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.goal-actions .btn-icon:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+.goal-actions .btn-icon.btn-danger:hover {
+    background: #ef4444;
+}
+
+.goal-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.goal-deadline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.goal-amounts {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.amount-saved,
+.amount-target {
+    display: flex;
+    flex-direction: column;
+}
+
+.amount-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.amount-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.amount-saved .amount-value {
+    color: #10b981;
+}
+
+.progress-section {
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.progress-fill.danger {
+    background: #ef4444;
+}
+
+.progress-fill.warning {
+    background: #f59e0b;
+}
+
+.progress-fill.primary {
+    background: var(--primary-color);
+}
+
+.progress-fill.success {
+    background: #10b981;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+}
+
+.progress-percentage {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.progress-remaining {
+    color: var(--text-secondary);
+}
+
+.goal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #10b981;
+    color: white;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.empty-goals {
+    grid-column: 1 / -1;
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 4rem 2rem;
+    text-align: center;
+    border: 2px dashed var(--border-color);
+}
+
+.empty-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 2.5rem;
+    color: var(--primary-color);
+}
+
+.empty-content h3 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-content p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .goals-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .goals-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+</style>
+
+<script>
+// Modal Functions
+function openAddGoalModal() {
+    document.getElementById('addGoalModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddGoalModal() {
+    document.getElementById('addGoalModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function openUpdateProgressModal(goalId, goalName) {
+    const form = document.getElementById('updateProgressForm');
+    form.action = `/update_goal_progress/${goalId}`;
+    form.querySelector('h3').innerHTML = `<i class="fas fa-chart-line"></i> Update "${goalName}"`;
+    document.getElementById('updateProgressModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeUpdateProgressModal() {
+    document.getElementById('updateProgressModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Close modals on outside click
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+</script>
+{% endblock %}

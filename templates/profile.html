@@ -1,0 +1,503 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - Smart Budget Planner{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1><i class="fas fa-user-circle"></i> Profile Settings</h1>
+            <p class="header-subtitle">Manage your account and preferences</p>
+        </div>
+    </div>
+
+    <div class="profile-grid">
+        <!-- Profile Info Card -->
+        <div class="profile-card">
+            <div class="card-header">
+                <h3><i class="fas fa-id-card"></i> Account Information</h3>
+            </div>
+            <div class="card-body">
+                <div class="profile-avatar">
+                    <div class="avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="avatar-info">
+                        <h4>{{ user.username }}</h4>
+                        <span class="member-since">Member since {{ user.created_at }}</span>
+                    </div>
+                </div>
+                
+                <form method="POST" action="{{ url_for('profile') }}" class="profile-form">
+                    <div class="form-group">
+                        <label for="username_display">Username</label>
+                        <input type="text" id="username_display" value="{{ user.username }}" disabled>
+                        <small class="form-help">Username cannot be changed</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" name="email" id="email" value="{{ user.email or '' }}" 
+                               placeholder="your@email.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="monthly_salary">Monthly Salary</label>
+                        <input type="number" name="monthly_salary" id="monthly_salary" 
+                               value="{{ user.monthly_salary or '' }}" step="0.01" min="0"
+                               placeholder="0.00">
+                        <small class="form-help">Used to calculate your daily spending limit</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Password Change Card -->
+        <div class="profile-card">
+            <div class="card-header">
+                <h3><i class="fas fa-lock"></i> Change Password</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('profile') }}" class="password-form">
+                    <div class="form-group">
+                        <label for="current_password">Current Password</label>
+                        <div class="password-input">
+                            <input type="password" name="current_password" id="current_password" 
+                                   placeholder="Enter current password">
+                            <button type="button" class="password-toggle" onclick="togglePassword('current_password')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new_password">New Password</label>
+                        <div class="password-input">
+                            <input type="password" name="new_password" id="new_password" 
+                                   placeholder="Enter new password" oninput="checkPasswordStrength(this.value)">
+                            <button type="button" class="password-toggle" onclick="togglePassword('new_password')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="password-strength" id="passwordStrength">
+                            <div class="strength-bar"></div>
+                            <span class="strength-text"></span>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-key"></i> Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Preferences Card -->
+        <div class="profile-card">
+            <div class="card-header">
+                <h3><i class="fas fa-cog"></i> Preferences</h3>
+            </div>
+            <div class="card-body">
+                <div class="preference-item">
+                    <div class="preference-info">
+                        <span class="preference-label">Dark Mode</span>
+                        <span class="preference-desc">Toggle between light and dark theme</span>
+                    </div>
+                    <button class="theme-toggle-btn" id="prefThemeToggle">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+                
+                <div class="preference-item">
+                    <div class="preference-info">
+                        <span class="preference-label">Notifications</span>
+                        <span class="preference-desc">Get alerts when budget is exceeded</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div class="preference-item">
+                    <div class="preference-info">
+                        <span class="preference-label">Weekly Reports</span>
+                        <span class="preference-desc">Receive weekly spending summary</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Actions Card -->
+        <div class="profile-card danger-zone">
+            <div class="card-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Danger Zone</h3>
+            </div>
+            <div class="card-body">
+                <div class="danger-item">
+                    <div class="danger-info">
+                        <span class="danger-label">Export Data</span>
+                        <span class="danger-desc">Download all your financial data</span>
+                    </div>
+                    <a href="{{ url_for('export_pdf') }}" class="btn btn-outline">
+                        <i class="fas fa-download"></i> Export
+                    </a>
+                </div>
+                
+                <div class="danger-item">
+                    <div class="danger-info">
+                        <span class="danger-label">Logout</span>
+                        <span class="danger-desc">Sign out from all devices</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="btn btn-warning">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.profile-page {
+    padding: 1rem 0;
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.profile-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.profile-card.danger-zone {
+    border-color: #ef4444;
+}
+
+.profile-card.danger-zone .card-header {
+    background: rgba(239, 68, 68, 0.05);
+    color: #ef4444;
+}
+
+.card-header {
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-header h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.profile-avatar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+}
+
+.avatar-info h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.member-since {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.profile-form,
+.password-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.password-input {
+    position: relative;
+}
+
+.password-input input {
+    padding-right: 45px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.2s;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
+}
+
+.password-strength {
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.strength-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+
+.strength-bar::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: #ef4444;
+    transition: all 0.3s;
+}
+
+.strength-bar.weak::after {
+    width: 33%;
+    background: #ef4444;
+}
+
+.strength-bar.medium::after {
+    width: 66%;
+    background: #f59e0b;
+}
+
+.strength-bar.strong::after {
+    width: 100%;
+    background: #10b981;
+}
+
+.strength-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 50px;
+}
+
+.preference-item,
+.danger-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.preference-item:last-child,
+.danger-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.preference-item:first-child,
+.danger-item:first-child {
+    padding-top: 0;
+}
+
+.preference-info,
+.danger-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.preference-label,
+.danger-label {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.preference-desc,
+.danger-desc {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.theme-toggle-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+}
+
+.theme-toggle-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.toggle-switch {
+    position: relative;
+    width: 50px;
+    height: 26px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--border-color);
+    transition: 0.3s;
+    border-radius: 26px;
+}
+
+.toggle-slider::before {
+    position: absolute;
+    content: '';
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--primary-color);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(24px);
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    border-color: #d97706;
+}
+
+@media (max-width: 640px) {
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const icon = event.currentTarget.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+function checkPasswordStrength(password) {
+    const strengthBar = document.querySelector('.strength-bar');
+    const strengthText = document.querySelector('.strength-text');
+    
+    let strength = 0;
+    
+    if (password.length >= 6) strength++;
+    if (password.length >= 10) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/\d/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    
+    strengthBar.className = 'strength-bar';
+    
+    if (password.length === 0) {
+        strengthText.textContent = '';
+    } else if (strength <= 2) {
+        strengthBar.classList.add('weak');
+        strengthText.textContent = 'Weak';
+        strengthText.style.color = '#ef4444';
+    } else if (strength <= 4) {
+        strengthBar.classList.add('medium');
+        strengthText.textContent = 'Medium';
+        strengthText.style.color = '#f59e0b';
+    } else {
+        strengthBar.classList.add('strong');
+        strengthText.textContent = 'Strong';
+        strengthText.style.color = '#10b981';
+    }
+}
+
+// Theme toggle in preferences
+document.getElementById('prefThemeToggle').addEventListener('click', function() {
+    document.getElementById('themeToggle').click();
+});
+</script>
+{% endblock %}
