@@ -22,7 +22,6 @@
         {% set total_target = goals|sum(attribute='target_amount') %}
         {% set total_saved = goals|sum(attribute='current_amount') %}
         {% set active_goals = goals|length %}
-        {% set completed_goals = goals|selectattr('current_amount', 'ge', attribute='target_amount')|list|length %}
         
         <div class="summary-card">
             <div class="summary-icon">
@@ -78,7 +77,7 @@
                 </div>
                 <div class="goal-actions">
                     {% if not is_completed %}
-                    <button class="btn-icon" onclick="openUpdateProgressModal({{ goal.id }}, '{{ goal.name }}')" title="Add Progress">
+                    <button class="btn-icon" onclick='openUpdateProgressModal({{ goal.id }}, {{ goal.name|tojson }})' title="Add Progress">
                         <i class="fas fa-plus"></i>
                     </button>
                     {% endif %}
@@ -530,7 +529,10 @@ function closeAddGoalModal() {
 function openUpdateProgressModal(goalId, goalName) {
     const form = document.getElementById('updateProgressForm');
     form.action = `/update_goal_progress/${goalId}`;
-    form.querySelector('h3').innerHTML = `<i class="fas fa-chart-line"></i> Update "${goalName}"`;
+    const title = document.querySelector('#updateProgressModal .modal-header h3');
+    if (title) {
+        title.innerHTML = `<i class="fas fa-chart-line"></i> Update "${goalName}"`;
+    }
     document.getElementById('updateProgressModal').classList.add('active');
     document.body.style.overflow = 'hidden';
 }
